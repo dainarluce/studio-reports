@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vendor QC — Dashboard Mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Work+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#080d1a; --card:#111b30; --card2:#0f1830; --line:#1e2b45; --line2:#26375a;
+    --blue:#3698E8; --sky:#7CC0F4; --muted:#8ea3c4; --muted2:#6a7ea0; --white:#eef4fc;
+    --green:#3ecf8e; --amber:#e8a63e; --red:#e8613e;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg); color:var(--white); font-family:'Work Sans',sans-serif; padding:30px; line-height:1.5;}
+  .wrap{max-width:1180px;margin:0 auto;}
+  .label{font-family:'Work Sans';font-weight:600;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--sky);margin-bottom:10px;}
+  .label .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--blue);margin-right:9px;vertical-align:1px;}
+  .badge{display:inline-block;background:rgba(232,166,62,.14);border:1px solid rgba(232,166,62,.4);color:var(--amber);
+    font-family:'Work Sans';font-weight:600;font-size:10.5px;letter-spacing:1.5px;text-transform:uppercase;border-radius:20px;padding:5px 12px;margin-bottom:14px;}
+
+  h1{font-family:'Inter';font-weight:800;font-size:30px;letter-spacing:-.5px;color:#fff;}
+  .sub{font-size:14px;color:var(--muted);margin-top:8px;max-width:720px;}
+
+  .section{margin-top:38px;}
+  .stitle{font-family:'Inter';font-weight:700;font-size:16px;color:#fff;margin-bottom:4px;}
+  .sdesc{font-size:12.5px;color:var(--muted);margin-bottom:16px;}
+
+  /* KPI cards */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+  .kpi{background:linear-gradient(180deg,var(--card),var(--card2));border:1px solid var(--line);border-radius:14px;padding:18px 18px 16px;}
+  .kpi .k{font-size:10.5px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted2);font-weight:600;}
+  .kpi .v{font-family:'Inter';font-weight:800;font-size:25px;color:#fff;margin-top:8px;}
+  .kpi .d{font-size:11.5px;color:var(--muted);margin-top:5px;}
+  .kpi.warn .v{color:var(--amber);}
+
+  /* chart card */
+  .card{background:linear-gradient(180deg,var(--card),var(--card2));border:1px solid var(--line);border-radius:16px;padding:22px 24px;}
+  .chart{display:flex;align-items:flex-end;gap:18px;height:180px;margin-top:10px;padding:0 6px;}
+  .bar-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;}
+  .bar{width:100%;max-width:64px;border-radius:8px 8px 4px 4px;background:linear-gradient(180deg,var(--sky),var(--blue));position:relative;}
+  .bar.empty{background:repeating-linear-gradient(135deg,#1c2947,#1c2947 6px,#233255 6px,#233255 12px);border:1px dashed var(--line2);}
+  .bar-val{font-family:'Inter';font-weight:700;font-size:11.5px;color:#fff;margin-bottom:6px;}
+  .bar-val.dim{color:var(--muted2);font-weight:600;}
+  .bar-lbl{margin-top:9px;font-size:11.5px;color:var(--muted);font-weight:500;}
+
+  /* table */
+  table{width:100%;border-collapse:collapse;margin-top:6px;}
+  th{text-align:left;font-size:10.5px;letter-spacing:1px;text-transform:uppercase;color:var(--muted2);font-weight:600;padding:9px 10px;border-bottom:1px solid var(--line2);}
+  th.num, td.num{text-align:right;}
+  td{padding:11px 10px;font-size:13px;color:var(--white);border-bottom:1px solid var(--line);}
+  tr:last-child td{border-bottom:none;}
+  tr.total td{font-weight:700;color:#fff;border-top:1px solid var(--line2);border-bottom:none;background:rgba(54,152,232,.06);}
+  .vname{font-weight:600;}
+  .flag{display:inline-block;font-size:10px;color:var(--muted2);margin-left:6px;}
+
+  /* two-col layout */
+  .cols2{display:grid;grid-template-columns:1.15fr .85fr;gap:16px;align-items:stretch;}
+
+  /* status pills */
+  .stat-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line);font-size:13px;}
+  .stat-row:last-child{border-bottom:none;}
+  .stat-name{display:flex;align-items:center;gap:9px;}
+  .sw{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+  .stat-count{font-family:'Inter';font-weight:700;color:#fff;}
+
+  /* alerts */
+  .alert{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-radius:10px;background:#0c1830;border:1px solid var(--line);margin-bottom:9px;}
+  .alert:last-child{margin-bottom:0;}
+  .alert .l{font-size:13px;color:#fff;font-weight:600;}
+  .alert .m{font-size:11.5px;color:var(--muted);margin-top:2px;}
+  .alert .amt{font-family:'Inter';font-weight:700;font-size:14px;color:var(--amber);white-space:nowrap;margin-left:14px;}
+  .alert.high{border-color:rgba(232,97,62,.4);}
+  .alert.high .amt{color:var(--red);}
+
+  /* template columns list */
+  .colgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:14px;}
+  .colitem{background:#0c1830;border:1px solid var(--line);border-radius:10px;padding:12px 14px;}
+  .colitem .n{font-family:'Inter';font-weight:600;font-size:13px;color:#fff;}
+  .colitem .t{font-size:11px;color:var(--sky);text-transform:uppercase;letter-spacing:.5px;margin-top:2px;}
+  .colitem .d{font-size:11.5px;color:var(--muted);margin-top:5px;}
+  .colitem.new{border-color:rgba(62,207,142,.4);background:rgba(62,207,142,.05);}
+  .colitem.new .t{color:var(--green);}
+
+  .fixlist{margin-top:14px;}
+  .fix{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--muted);}
+  .fix:last-child{border-bottom:none;}
+  .fix b{color:#fff;font-weight:600;}
+  .fix .x{color:var(--red);font-weight:700;flex-shrink:0;}
+
+  .footnote{margin-top:34px;padding-top:18px;border-top:1px solid var(--line);font-size:11px;color:var(--muted2);letter-spacing:.2px;}
+  @media(max-width:820px){.kpis{grid-template-columns:1fr 1fr;}.cols2{grid-template-columns:1fr;}.colgrid{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="label"><span class="dot"></span>Vendors Invoices · Proposal</div>
+  <span class="badge">Mockup — not applied to the real sheet yet</span>
+  <h1>Vendor QC — Monthly Dashboard</h1>
+  <div class="sub">Real numbers pulled from your current monthly tabs (Dec 2025 – Jun 2026). This is a proposal for what a "Dashboard" tab could look like — pulling from each month automatically — that you could present to Carmine.</div>
+
+  <!-- KPIs -->
+  <div class="section">
+    <div class="kpis">
+      <div class="kpi">
+        <div class="k">Total invoiced (Mar–Jun)</div>
+        <div class="v">$68,216.92</div>
+        <div class="d">4 months with amount data recorded</div>
+      </div>
+      <div class="kpi warn">
+        <div class="k">Pending payment</div>
+        <div class="v">$46,023.50</div>
+        <div class="d">67% of that total is still "waiting"</div>
+      </div>
+      <div class="kpi">
+        <div class="k">Active vendors</div>
+        <div class="v">4 / 5</div>
+        <div class="d">Color Expert has had no activity since March</div>
+      </div>
+      <div class="kpi">
+        <div class="k">Months missing amount</div>
+        <div class="v">3</div>
+        <div class="d">Dec, Jan, Feb — no "Amount" column</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Spend by month -->
+  <div class="section">
+    <div class="stitle">Spend by month</div>
+    <div class="sdesc">Dec–Feb show no data because those tabs never had an amount column — this is exactly why the template needs to be locked down.</div>
+    <div class="card">
+      <div class="chart">
+        <div class="bar-col"><div class="bar-val dim">—</div><div class="bar empty" style="height:14%"></div><div class="bar-lbl">Dec 25</div></div>
+        <div class="bar-col"><div class="bar-val dim">—</div><div class="bar empty" style="height:14%"></div><div class="bar-lbl">Jan 26</div></div>
+        <div class="bar-col"><div class="bar-val dim">—</div><div class="bar empty" style="height:14%"></div><div class="bar-lbl">Feb 26</div></div>
+        <div class="bar-col"><div class="bar-val">$11,924</div><div class="bar" style="height:37%"></div><div class="bar-lbl">Mar 26</div></div>
+        <div class="bar-col"><div class="bar-val">$7,742</div><div class="bar" style="height:24%"></div><div class="bar-lbl">Apr 26</div></div>
+        <div class="bar-col"><div class="bar-val">$31,197</div><div class="bar" style="height:97%"></div><div class="bar-lbl">May 26</div></div>
+        <div class="bar-col"><div class="bar-val">$17,354</div><div class="bar" style="height:54%"></div><div class="bar-lbl">Jun 26</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Vendor table + status/alerts -->
+  <div class="section cols2">
+    <div class="card">
+      <div class="stitle">Spend by vendor</div>
+      <div class="sdesc">March – June 2026</div>
+      <table>
+        <tr><th>Vendor</th><th class="num">Mar</th><th class="num">Apr</th><th class="num">May</th><th class="num">Jun</th><th class="num">Total</th></tr>
+        <tr><td class="vname">Potion Flat Rate</td><td class="num">$5,120</td><td class="num">$2,375</td><td class="num">$2,410</td><td class="num">$11,255</td><td class="num">$21,160</td></tr>
+        <tr><td class="vname">Potion Hour Rate</td><td class="num">$5,633</td><td class="num">$2,727</td><td class="num">$28,338.50</td><td class="num">$2,791</td><td class="num">$39,489.50</td></tr>
+        <tr><td class="vname">Color Expert<span class="flag">no activity</span></td><td class="num">$0</td><td class="num">$0</td><td class="num">$0</td><td class="num">$0</td><td class="num">$0</td></tr>
+        <tr><td class="vname">GSL</td><td class="num">$195</td><td class="num">$0</td><td class="num">$0</td><td class="num">$2,396.42</td><td class="num">$2,591.42</td></tr>
+        <tr><td class="vname">Pixshot</td><td class="num">$976</td><td class="num">$2,640</td><td class="num">$448</td><td class="num">$912</td><td class="num">$4,976</td></tr>
+        <tr class="total"><td>Total</td><td class="num">$11,924</td><td class="num">$7,742</td><td class="num">$31,196.50</td><td class="num">$17,354.42</td><td class="num">$68,216.92</td></tr>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="stitle">Status — June (most recent)</div>
+      <div class="sdesc">Snapshot of the current month</div>
+      <div class="stat-row"><div class="stat-name"><span class="sw" style="background:var(--green)"></span>Complete</div><div class="stat-count">1</div></div>
+      <div class="stat-row"><div class="stat-name"><span class="sw" style="background:var(--amber)"></span>Waiting on payment (Ruth)</div><div class="stat-count">2</div></div>
+      <div class="stat-row"><div class="stat-name"><span class="sw" style="background:var(--sky)"></span>Approved, ready for PO</div><div class="stat-count">1</div></div>
+      <div class="stat-row"><div class="stat-name"><span class="sw" style="background:var(--muted2)"></span>Not used this month</div><div class="stat-count">1</div></div>
+    </div>
+  </div>
+
+  <!-- Alerts -->
+  <div class="section">
+    <div class="stitle">What Carmine needs to see</div>
+    <div class="sdesc">Approved / in-process invoices that haven't been paid yet, sorted by age</div>
+    <div class="card">
+      <div class="alert high">
+        <div><div class="l">Potion Hour Rate — May 2026</div><div class="m">Waiting on payment from Ruth · oldest pending item</div></div>
+        <div class="amt">$28,338.50</div>
+      </div>
+      <div class="alert">
+        <div><div class="l">Potion Flat Rate — June 2026</div><div class="m">Waiting on payment from Ruth</div></div>
+        <div class="amt">$11,255.00</div>
+      </div>
+      <div class="alert">
+        <div><div class="l">Potion Hour Rate — June 2026</div><div class="m">Approved, ready to generate PO</div></div>
+        <div class="amt">$2,791.00</div>
+      </div>
+      <div class="alert">
+        <div><div class="l">Potion Hour Rate — April 2026</div><div class="m">Waiting on payment</div></div>
+        <div class="amt">$2,727.00</div>
+      </div>
+      <div class="alert">
+        <div><div class="l">Pixshot — June 2026</div><div class="m">Waiting on payment from Ruth</div></div>
+        <div class="amt">$912.00</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Template redesign -->
+  <div class="section">
+    <div class="stitle">Improved template — what would change</div>
+    <div class="sdesc">I compared all 7 monthly tabs: each one has different columns and different status labels, which makes it impossible to roll everything up into a dashboard without manually fixing each tab first.</div>
+    <div class="card">
+      <div class="fixlist">
+        <div class="fix"><span class="x">✕</span><div><b>Missing "Amount" column</b> in Dec, Jan, and Feb — there's no way to total those 3 months.</div></div>
+        <div class="fix"><span class="x">✕</span><div><b>Different Status labels every month</b> — "Complete" / "COMPLETED", "W Ruth need payment" / "WAITING FOR PAY", "DONT USE THIS MO" / "DON USE THIS MONTHS" / "NO WORK IN JANUARY". The dashboard can't group these automatically.</div></div>
+        <div class="fix"><span class="x">✕</span><div><b>"PO Requested date"</b> doesn't exist in Dec or Jan — it only shows up starting in Feb.</div></div>
+        <div class="fix"><span class="x">✕</span><div><b>Inconsistent total label</b> — "Total" vs "TOTAL IN VENDORS" across different tabs.</div></div>
+      </div>
+    </div>
+
+    <div class="colgrid">
+      <div class="colitem"><div class="n">Month and Year</div><div class="t">no change</div><div class="d">Stays the same, fixed date format</div></div>
+      <div class="colitem"><div class="n">Vendor</div><div class="t">no change</div><div class="d">Fixed list of 5 vendors (dropdown, not free text)</div></div>
+      <div class="colitem"><div class="n">Invoice Received</div><div class="t">no change</div><div class="d">Date</div></div>
+      <div class="colitem"><div class="n">Invoice Approved</div><div class="t">no change</div><div class="d">Checkbox</div></div>
+      <div class="colitem"><div class="n">PO Requested</div><div class="t">no change</div><div class="d">Checkbox</div></div>
+      <div class="colitem new"><div class="n">PO Requested Date</div><div class="t">lock into every tab</div><div class="d">Present in every month, not just from February on</div></div>
+      <div class="colitem"><div class="n">Pay Requested</div><div class="t">no change</div><div class="d">Date</div></div>
+      <div class="colitem"><div class="n">Invoice Paid</div><div class="t">no change</div><div class="d">Date</div></div>
+      <div class="colitem"><div class="n">Advice Vendor Invoice Paid</div><div class="t">no change</div><div class="d">Checkbox</div></div>
+      <div class="colitem"><div class="n">Invoice Number / PO Number</div><div class="t">no change</div><div class="d">Text</div></div>
+      <div class="colitem new"><div class="n">Amount</div><div class="t">required in every tab</div><div class="d">Without this nothing can be totaled</div></div>
+      <div class="colitem new"><div class="n">Status</div><div class="t">single fixed dropdown</div><div class="d">Complete · Waiting for Pay · Approved – Ready for PO · Not Used This Month — same 4 options every time, same color</div></div>
+    </div>
+  </div>
+
+  <div class="footnote"><b>Next step:</b> if you like this design, I'll build it directly in the Google Sheet — update the TEMPLATE tab with these locked columns and the unified Status dropdown, and add a "Dashboard" tab with formulas that pull from each month automatically (no more copying numbers by hand).</div>
+</div>
+</body>
+</html>
