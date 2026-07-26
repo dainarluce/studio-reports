@@ -50,6 +50,11 @@
   .err code{font-family:ui-monospace,Menlo,monospace;font-size:12px;background:rgba(0,0,0,.3);
     border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:1px 5px;color:#fff;}
   .err.show{display:block;}
+  .warn-banner{display:none;background:rgba(232,166,62,.1);border:1px solid rgba(232,166,62,.45);
+    border-radius:12px;padding:14px 16px;margin-top:22px;font-size:13px;color:#ffeccd;}
+  .warn-banner b{color:#fff;}
+  .warn-banner.show{display:block;}
+  .warn-banner ul{margin:6px 0 0 18px;}
 
   .section{margin-top:38px;}
   .stitle{font-family:'Inter';font-weight:700;font-size:16px;color:#fff;margin-bottom:4px;}
@@ -128,6 +133,7 @@
   </div>
 
   <div class="err" id="err"></div>
+  <div class="warn-banner" id="warn"></div>
 
   <div class="section"><div class="kpis" id="kpis"></div></div>
 
@@ -165,11 +171,12 @@
 
   var CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vThcMQgIbmHAhgAQSweG1tffOISuIU31PIcUBY0DPccivtqn5iJUQkGOOtFV-1viCsRURiAH0J01SW_/pub?output=csv";
 
+  // Labels mirror the wording of the sheet's own Invoice Status dropdown.
   var STATUSES = [
-    { key:"complete", label:"Complete",                 color:"var(--green)" },
-    { key:"waiting",  label:"Waiting for Pay",          color:"var(--amber)" },
-    { key:"po",       label:"Approved — Ready for PO",  color:"var(--sky)"   },
-    { key:"unused",   label:"Not Used This Month",      color:"var(--muted2)"}
+    { key:"complete", label:"Complete",                  color:"var(--green)" },
+    { key:"waiting",  label:"With Ruth — need payment",  color:"var(--amber)" },
+    { key:"po",       label:"Approved — ready for PO",   color:"var(--sky)"   },
+    { key:"unused",   label:"Did not use this month",    color:"var(--muted2)"}
   ];
 
   var el = function(id){ return document.getElementById(id); };
@@ -222,6 +229,22 @@
     var d = new Date(t);
     return isNaN(d.getTime()) ? null : new Date(d.getFullYear(), d.getMonth(), 1);
   }
+  // Exact date, unlike parseMonth which flattens to the 1st.
+  function parseDate(v){
+    var t = String(v == null ? "" : v).trim();
+    if(!t) return null;
+    var m = t.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if(m) return new Date(+m[3], +m[1]-1, +m[2]);
+    var d = new Date(t);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  function daysSince(d){
+    if(!d) return null;
+    var today = new Date(); today.setHours(0,0,0,0);
+    var then = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    var n = Math.round((today - then) / 86400000);
+    return n < 0 ? null : n;
+  }
   function shortMonth(d){
     return d.toLocaleString("en-US",{month:"short"}) + " " + String(d.getFullYear()).slice(2);
   }
@@ -233,10 +256,12 @@
   function normStatus(raw){
     var s = String(raw == null ? "" : raw).toLowerCase().replace(/[^a-z ]/g," ").replace(/\s+/g," ").trim();
     if(!s) return null;
-    if(/don?t? ?use|no work|not used|unused|skip/.test(s)) return "unused";
-    if(/complet|done|paid|closed/.test(s)) return "complete";
-    if(/wait|need payment|ruth|pending|unpaid|w pay/.test(s)) return "waiting";
-    if(/approv|ready|po/.test(s)) return "po";
+    // Order matters. Covers every spelling seen so far: "Did not use this month",
+    // "DONT USE THIS MONTH", "DON USE THIS MONTHS", "NO WORK IN JANUARY".
+    if(/n[o']?t? ?use|no work|unused|skip/.test(s)) return "unused";
+    if(/complet|done|closed|paid/.test(s)) return "complete";
+    if(/wait|need payment|ruth|pending|unpaid/.test(s)) return "waiting";
+    if(/approv|ready|\bpo\b/.test(s)) return "po";
     return "other";
   }
   function statusLabel(key, raw){
@@ -244,9 +269,16 @@
     return String(raw || "Unlabelled");
   }
 
-  function findCol(headers, re){
-    for(var i=0;i<headers.length;i++){
-      if(re.test(String(headers[i]).toLowerCase().trim())) return i;
+  // Header names drift as the sheet gets tidied up ("Status" -> "Invoice Status",
+  // "amount" -> "Total Invoice Amount"), so match on a list of patterns, best first.
+  function findCol(headers, tries){
+    var norm = headers.map(function(h){
+      return String(h == null ? "" : h).toLowerCase().replace(/\s+/g," ").trim();
+    });
+    for(var t=0; t<tries.length; t++){
+      for(var i=0; i<norm.length; i++){
+        if(norm[i] && tries[t].test(norm[i])) return i;
+      }
     }
     return -1;
   }
@@ -254,12 +286,24 @@
   function shape(rows){
     if(!rows.length) throw new Error("The sheet came back empty.");
     var headers = rows[0];
-    var cMonth  = findCol(headers, /^month/);
-    var cVendor = findCol(headers, /^vendor/);
-    var cStatus = findCol(headers, /^status/);
-    var cAmount = findCol(headers, /amount/);
+    // "Vendor" must not lose to "Vendor Invoice Number", so exact match is tried first.
+    var cVendor = findCol(headers, [/^vendor$/, /^vendor name$/, /^vendor(?!.*(number|no|#))/, /vendor(?!.*(number|no|#))/]);
+    var cAmount = findCol(headers, [/^amount$/, /^total.*amount$/, /amount/, /^total/]);
+    var cMonth  = findCol(headers, [/^month and year$/, /^month/, /month.*year/, /month/]);
+    var cStatus = findCol(headers, [/^status$/, /^invoice status$/, /status/]);
+    var cRecv   = findCol(headers, [/^invoice received date$/, /^invoice received/, /invoice received/, /^received/]);
     if(cVendor < 0 || cAmount < 0){
-      throw new Error("Couldn't find a Vendor and an Amount column in the sheet.");
+      throw new Error("Couldn't find a Vendor column and an Amount column. The sheet has: "+
+        headers.filter(function(h){ return String(h).trim(); }).join(", ")+".");
+    }
+
+    var warnings = [];
+    if(cStatus < 0){
+      warnings.push("No Status column found, so the status panel and the pending-payment total can't be "+
+        "calculated. Expected a column with “status” in its name.");
+    }
+    if(cMonth < 0){
+      warnings.push("No “Month and Year” column found, so everything is grouped as a single period.");
     }
 
     var records = [];
@@ -274,6 +318,7 @@
         month: month,
         monthKey: month ? month.getFullYear()+"-"+month.getMonth() : "unknown",
         amount: money(row[cAmount]),
+        received: cRecv >= 0 ? parseDate(row[cRecv]) : null,
         rawStatus: rawStatus,
         status: normStatus(rawStatus)
       });
@@ -297,7 +342,7 @@
       return a.date - b.date;
     });
 
-    return { records:records, months:months, vendors:vendorOrder };
+    return { records:records, months:months, vendors:vendorOrder, warnings:warnings };
   }
 
   // ---------- skeletons ----------
@@ -351,13 +396,17 @@
 
   // ---------- real render ----------
   function renderKPIs(data){
-    var grand = 0, pending = 0, open = 0;
+    var grand = 0, pending = 0, open = 0, oldest = null;
     var vendorTotals = {};
     data.records.forEach(function(rec){
       grand += rec.amount;
       vendorTotals[rec.vendor] = (vendorTotals[rec.vendor] || 0) + rec.amount;
       if(rec.status === "waiting") pending += rec.amount;
-      if(rec.amount > 0 && rec.status !== "complete") open++;
+      if(rec.amount > 0 && rec.status !== "complete"){
+        open++;
+        var age = daysSince(rec.received);
+        if(age !== null && (oldest === null || age > oldest)) oldest = age;
+      }
     });
     var active = data.vendors.filter(function(v){ return vendorTotals[v] > 0; }).length;
     var monthsWithData = data.months.filter(function(m){ return m.total > 0; }).length;
@@ -373,7 +422,8 @@
       { k:"Total invoiced"+(span ? " ("+span+")" : ""), v:fmt(grand), d:monthsWithData+" month"+(monthsWithData===1?"":"s")+" with amount data" },
       { k:"Pending payment", v:fmt(pending), d:pct+"% of that total is still waiting", warn:true },
       { k:"Active vendors", v:active+" / "+data.vendors.length, d:(data.vendors.length-active)+" with no spend recorded" },
-      { k:"Open invoices", v:String(open), d:"Not marked complete yet" }
+      { k:"Open invoices", v:String(open),
+        d:oldest === null ? "Not marked complete yet" : "Oldest waiting "+oldest+" day"+(oldest===1?"":"s") }
     ];
 
     el("kpis").innerHTML = cards.map(function(c){
@@ -469,7 +519,13 @@
   function renderAlerts(data){
     var open = data.records.filter(function(rec){
       return rec.amount > 0 && rec.status !== "complete" && rec.status !== "unused";
-    }).sort(function(a,b){ return b.amount - a.amount; });
+    }).sort(function(a,b){
+      // Oldest invoice first — that's the one that needs chasing. Undated rows sink to the bottom.
+      if(a.received && b.received) return a.received - b.received;
+      if(a.received) return -1;
+      if(b.received) return 1;
+      return b.amount - a.amount;
+    });
 
     if(!open.length){
       el("alerts").innerHTML = '<div class="empty-note">Nothing outstanding — every invoice with an amount is marked complete.</div>';
@@ -477,14 +533,21 @@
     }
     el("alerts").innerHTML = open.map(function(rec, i){
       var when = rec.month ? longMonth(rec.month) : "no month set";
-      var note = statusLabel(rec.status, rec.rawStatus);
-      if(rec.rawStatus && rec.status !== "other") note += " · sheet says “"+rec.rawStatus+"”";
+      var label = statusLabel(rec.status, rec.rawStatus);
+      var parts = [label];
+      var age = daysSince(rec.received);
+      if(age !== null) parts.push(age === 0 ? "invoice arrived today" : age+" day"+(age===1?"":"s")+" since invoice arrived");
+      // Only echo the sheet's raw text when it actually differs from the canonical label.
+      if(rec.rawStatus && simplify(rec.rawStatus) !== simplify(label)) parts.push("sheet says “"+rec.rawStatus+"”");
+      var note = parts.join(" · ");
       return '<div class="alert'+(i === 0 ? " high" : "")+'">'+
         '<div><div class="l">'+esc(rec.vendor+" — "+when)+'</div>'+
         '<div class="m">'+esc(note)+'</div></div>'+
         '<div class="amt">'+esc(fmt(rec.amount))+"</div></div>";
     }).join("");
   }
+
+  function simplify(s){ return String(s).toLowerCase().replace(/[^a-z0-9]/g,""); }
 
   function esc(s){
     return String(s).replace(/[&<>"']/g, function(c){
@@ -518,6 +581,7 @@
     document.body.classList.remove("failed");
     el("reload").disabled = true;
     el("err").classList.remove("show");
+    el("warn").classList.remove("show");
     el("stamp").textContent = "Fetching latest…";
     renderSkeleton();
 
@@ -528,6 +592,11 @@
       })
       .then(function(text){
         var data = shape(parseCSV(text));
+        if(data.warnings.length){
+          el("warn").innerHTML = "<b>The sheet loaded, but some columns weren’t recognised:</b><ul>"+
+            data.warnings.map(function(w){ return "<li>"+esc(w)+"</li>"; }).join("")+"</ul>";
+          el("warn").classList.add("show");
+        }
         renderKPIs(data);
         renderChart(data);
         renderVendorTable(data);
