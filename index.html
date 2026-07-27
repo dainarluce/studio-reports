@@ -3,78 +3,127 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Vendor Invoice Report — Live</title>
+<title>Studio 303 — Vendors Dashboard</title>
+<!-- Set the theme before first paint so a light-mode reload never flashes dark. -->
+<script>
+(function(){
+  try{
+    var t = localStorage.getItem("studio303-theme");
+    if(t !== "light" && t !== "dark"){
+      t = (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches) ? "light" : "dark";
+    }
+    document.documentElement.setAttribute("data-theme", t);
+  }catch(e){ document.documentElement.setAttribute("data-theme","dark"); }
+})();
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Work+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
+  /* Dark is the default. Every colour that differs between themes lives here as a
+     variable, so the light theme below only has to restate values, never rules. */
   :root{
+    color-scheme:dark;
     --bg:#080d1a; --card:#111b30; --card2:#0f1830; --line:#1e2b45; --line2:#26375a;
     --blue:#3698E8; --sky:#7CC0F4; --muted:#8ea3c4; --muted2:#6a7ea0; --white:#eef4fc;
     --green:#3ecf8e; --amber:#e8a63e; --red:#e8613e;
+    --strong:#ffffff;                 /* headings and key figures */
+    --panel:#0c1830;                  /* alert rows, insets */
+    --bar-from:#7CC0F4; --bar-to:#3698E8;
+    --hatch1:#1c2947; --hatch2:#233255;
+    --skel1:#182543; --skel2:#233350;
+    --btn1:#16233d; --btn2:#111b30; --btn1h:#1a2a49; --btn2h:#141f38;
+    --tint:rgba(54,152,232,.06); --tint2:rgba(54,152,232,.05);
+    --err-bg:rgba(232,97,62,.1); --err-bd:rgba(232,97,62,.45); --err-fg:#ffd9d0;
+    --warn-bg:rgba(232,166,62,.1); --warn-bd:rgba(232,166,62,.45); --warn-fg:#ffeccd;
+    --code-bg:rgba(0,0,0,.3); --code-bd:rgba(255,255,255,.12);
+    --shadow:none;
+  }
+  [data-theme="light"]{
+    color-scheme:light;
+    --bg:#f4f6fa; --card:#ffffff; --card2:#fbfcfe; --line:#e5e9f1; --line2:#d3dae6;
+    --blue:#1b6fb5; --sky:#17618f; --muted:#5a6a84; --muted2:#78879f; --white:#111827;
+    --green:#0e8f5a; --amber:#9a6206; --red:#c0410f;
+    --strong:#0b1220;
+    --panel:#f7f9fc;
+    --bar-from:#78b5e9; --bar-to:#1b6fb5;
+    --hatch1:#eef2f8; --hatch2:#e1e8f2;
+    --skel1:#e7ecf4; --skel2:#dae2ed;
+    --btn1:#ffffff; --btn2:#f3f6fb; --btn1h:#ffffff; --btn2h:#e9f1fa;
+    --tint:rgba(27,111,181,.07); --tint2:rgba(27,111,181,.05);
+    --err-bg:#fdeeea; --err-bd:rgba(192,65,15,.35); --err-fg:#7c2d12;
+    --warn-bg:#fdf6e7; --warn-bd:rgba(154,98,6,.35); --warn-fg:#6f4106;
+    --code-bg:rgba(0,0,0,.06); --code-bd:rgba(0,0,0,.13);
+    --shadow:0 1px 2px rgba(16,24,40,.04);
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  body{background:var(--bg); color:var(--white); font-family:'Work Sans',sans-serif; padding:30px; line-height:1.5;}
+  body{background:var(--bg); color:var(--white); font-family:'Work Sans',sans-serif; padding:30px; line-height:1.5;
+    transition:background-color .2s ease, color .2s ease;}
   .wrap{max-width:1180px;margin:0 auto;}
   .label{font-family:'Work Sans';font-weight:600;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--sky);margin-bottom:10px;}
   .label .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--blue);margin-right:9px;vertical-align:1px;}
 
-  h1{font-family:'Inter';font-weight:800;font-size:30px;letter-spacing:-.5px;color:#fff;}
+  h1{font-family:'Inter';font-weight:800;font-size:30px;letter-spacing:-.5px;color:var(--strong);}
   .sub{font-size:14px;color:var(--muted);margin-top:8px;max-width:720px;}
+  .sheetlink{display:inline-block;margin-top:9px;font-size:12.5px;font-weight:500;color:var(--blue);
+    text-decoration:none;border-bottom:1px solid transparent;transition:border-color .15s;}
+  .sheetlink:hover{border-bottom-color:var(--blue);}
+  .sheetlink .arrow{font-size:11px;}
 
   /* header bar */
   .topbar{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:wrap;}
   .refresh{display:flex;align-items:center;gap:12px;flex-shrink:0;margin-top:4px;}
   .stamp{font-size:11px;color:var(--muted2);letter-spacing:.3px;text-align:right;}
-  button.rl{display:inline-flex;align-items:center;gap:8px;background:linear-gradient(180deg,#16233d,#111b30);
+  button.rl{display:inline-flex;align-items:center;gap:8px;background:linear-gradient(180deg,var(--btn1),var(--btn2));
     border:1px solid var(--line2);border-radius:10px;color:var(--white);font-family:'Work Sans',sans-serif;
-    font-weight:600;font-size:12.5px;padding:10px 16px;cursor:pointer;transition:border-color .15s,background .15s;}
-  button.rl:hover:not(:disabled){border-color:var(--blue);background:linear-gradient(180deg,#1a2a49,#141f38);}
+    font-weight:600;font-size:12.5px;padding:10px 16px;cursor:pointer;box-shadow:var(--shadow);
+    transition:border-color .15s,background .15s;}
+  button.rl:hover:not(:disabled){border-color:var(--blue);background:linear-gradient(180deg,var(--btn1h),var(--btn2h));}
   button.rl:disabled{opacity:.6;cursor:default;}
   button.rl svg{width:14px;height:14px;}
-  body.loading button.rl svg{animation:spin .9s linear infinite;}
+  body.loading button#reload svg{animation:spin .9s linear infinite;}
   @keyframes spin{to{transform:rotate(360deg)}}
 
   /* ghost / skeleton loading */
   .skel{display:inline-block;color:transparent!important;border-radius:6px;vertical-align:middle;
-    background:linear-gradient(90deg,#182543 25%,#233350 50%,#182543 75%);background-size:200% 100%;
+    background:linear-gradient(90deg,var(--skel1) 25%,var(--skel2) 50%,var(--skel1) 75%);background-size:200% 100%;
     animation:shimmer 1.3s ease-in-out infinite;}
   @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
-  .skel.bar{background:linear-gradient(180deg,#233350,#182543);animation:pulse 1.3s ease-in-out infinite;}
+  .skel.bar{background:linear-gradient(180deg,var(--skel2),var(--skel1));animation:pulse 1.3s ease-in-out infinite;}
   @keyframes pulse{0%,100%{opacity:.45}50%{opacity:.9}}
-  @media(prefers-reduced-motion:reduce){.skel,.skel.bar,body.loading button.rl svg{animation:none}}
+  @media(prefers-reduced-motion:reduce){.skel,.skel.bar,body.loading button#reload svg{animation:none}}
   /* a failed fetch leaves placeholders on screen — stop them looking like they're still loading */
   body.failed .skel{animation:none;opacity:.3;}
 
-  .err{display:none;background:rgba(232,97,62,.1);border:1px solid rgba(232,97,62,.45);border-radius:12px;
-    padding:14px 16px;margin-top:22px;font-size:13px;color:#ffd9d0;}
-  .err b{color:#fff;}
-  .err code{font-family:ui-monospace,Menlo,monospace;font-size:12px;background:rgba(0,0,0,.3);
-    border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:1px 5px;color:#fff;}
+  .err{display:none;background:var(--err-bg);border:1px solid var(--err-bd);border-radius:12px;
+    padding:14px 16px;margin-top:22px;font-size:13px;color:var(--err-fg);}
+  .err b{color:var(--strong);}
+  .err code{font-family:ui-monospace,Menlo,monospace;font-size:12px;background:var(--code-bg);
+    border:1px solid var(--code-bd);border-radius:4px;padding:1px 5px;color:var(--strong);}
   .err.show{display:block;}
-  .warn-banner{display:none;background:rgba(232,166,62,.1);border:1px solid rgba(232,166,62,.45);
-    border-radius:12px;padding:14px 16px;margin-top:22px;font-size:13px;color:#ffeccd;}
-  .warn-banner b{color:#fff;}
+  .warn-banner{display:none;background:var(--warn-bg);border:1px solid var(--warn-bd);
+    border-radius:12px;padding:14px 16px;margin-top:22px;font-size:13px;color:var(--warn-fg);}
+  .warn-banner b{color:var(--strong);}
   .warn-banner.show{display:block;}
   .warn-banner ul{margin:6px 0 0 18px;}
 
   .section{margin-top:38px;}
-  .stitle{font-family:'Inter';font-weight:700;font-size:16px;color:#fff;margin-bottom:4px;}
+  .stitle{font-family:'Inter';font-weight:700;font-size:16px;color:var(--strong);margin-bottom:4px;}
   .sdesc{font-size:12.5px;color:var(--muted);margin-bottom:16px;}
 
   /* KPI cards */
   .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
-  .kpi{background:linear-gradient(180deg,var(--card),var(--card2));border:1px solid var(--line);border-radius:14px;padding:18px 18px 16px;}
+  .kpi{background:linear-gradient(180deg,var(--card),var(--card2));border:1px solid var(--line);border-radius:14px;padding:18px 18px 16px;box-shadow:var(--shadow);}
   .kpi .k{font-size:10.5px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted2);font-weight:600;}
-  .kpi .v{font-family:'Inter';font-weight:800;font-size:25px;color:#fff;margin-top:8px;}
+  .kpi .v{font-family:'Inter';font-weight:800;font-size:25px;color:var(--strong);margin-top:8px;}
   .kpi .d{font-size:11.5px;color:var(--muted);margin-top:5px;}
   .kpi.warn .v{color:var(--amber);}
 
   /* chart card */
-  .card{background:linear-gradient(180deg,var(--card),var(--card2));border:1px solid var(--line);border-radius:16px;padding:22px 24px;}
+  .card{background:linear-gradient(180deg,var(--card),var(--card2));border:1px solid var(--line);border-radius:16px;padding:22px 24px;box-shadow:var(--shadow);}
   .chart{display:flex;align-items:flex-end;gap:18px;height:180px;margin-top:10px;padding:0 6px;}
   .bar-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:44px;}
-  .bar{width:100%;max-width:64px;border-radius:8px 8px 4px 4px;background:linear-gradient(180deg,var(--sky),var(--blue));transition:height .5s ease;}
-  .bar.empty{background:repeating-linear-gradient(135deg,#1c2947,#1c2947 6px,#233255 6px,#233255 12px);border:1px dashed var(--line2);}
-  .bar-val{font-family:'Inter';font-weight:700;font-size:11.5px;color:#fff;margin-bottom:6px;}
+  .bar{width:100%;max-width:64px;border-radius:8px 8px 4px 4px;background:linear-gradient(180deg,var(--bar-from),var(--bar-to));transition:height .5s ease;}
+  .bar.empty{background:repeating-linear-gradient(135deg,var(--hatch1),var(--hatch1) 6px,var(--hatch2) 6px,var(--hatch2) 12px);border:1px dashed var(--line2);}
+  .bar-val{font-family:'Inter';font-weight:700;font-size:11.5px;color:var(--strong);margin-bottom:6px;}
   .bar-val.dim{color:var(--muted2);font-weight:600;}
   .bar-lbl{margin-top:9px;font-size:11.5px;color:var(--muted);font-weight:500;white-space:nowrap;}
 
@@ -85,9 +134,9 @@
   th.num, td.num{text-align:right;}
   td{padding:11px 10px;font-size:13px;color:var(--white);border-bottom:1px solid var(--line);white-space:nowrap;}
   tr:last-child td{border-bottom:none;}
-  tr.total td{font-weight:700;color:#fff;border-top:1px solid var(--line2);border-bottom:none;background:rgba(54,152,232,.06);}
+  tr.total td{font-weight:700;color:var(--strong);border-top:1px solid var(--line2);border-bottom:none;background:var(--tint);}
   .vname{font-weight:600;}
-  tr.grouphead td{background:rgba(54,152,232,.05);font-weight:600;color:#fff;}
+  tr.grouphead td{background:var(--tint2);font-weight:600;color:var(--strong);}
   td.gname{font-family:'Inter';font-weight:700;font-size:12.5px;color:var(--sky);letter-spacing:.3px;}
   td.vname.sub{padding-left:28px;font-weight:500;}
   .flag{display:inline-block;font-size:10px;color:var(--muted2);margin-left:6px;}
@@ -100,12 +149,12 @@
   .stat-row:last-child{border-bottom:none;}
   .stat-name{display:flex;align-items:center;gap:9px;}
   .sw{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
-  .stat-count{font-family:'Inter';font-weight:700;color:#fff;}
+  .stat-count{font-family:'Inter';font-weight:700;color:var(--strong);}
 
   /* alerts */
-  .alert{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-radius:10px;background:#0c1830;border:1px solid var(--line);margin-bottom:9px;}
+  .alert{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-radius:10px;background:var(--panel);border:1px solid var(--line);margin-bottom:9px;}
   .alert:last-child{margin-bottom:0;}
-  .alert .l{font-size:13px;color:#fff;font-weight:600;}
+  .alert .l{font-size:13px;color:var(--strong);font-weight:600;}
   .alert .m{font-size:11.5px;color:var(--muted);margin-top:2px;}
   .alert .amt{font-family:'Inter';font-weight:700;font-size:14px;color:var(--amber);white-space:nowrap;margin-left:14px;}
   .alert.high{border-color:rgba(232,97,62,.4);}
@@ -121,11 +170,18 @@
   <div class="topbar">
     <div>
       <div class="label"><span class="dot"></span>Vendor Invoice Report · Live</div>
-      <h1>Vendor Dashboard</h1>
+      <h1>Studio 303 — Vendors Dashboard</h1>
       <div class="sub" id="sub">Pulled live from the published Google Sheet each time this page loads.</div>
+      <a class="sheetlink" id="sheetlink"
+         href="https://docs.google.com/spreadsheets/d/1JythZCvEqx3xHaRsIyUtelivANPwlrrB9B2Ba5Mupok/edit?gid=1246474389#gid=1246474389"
+         target="_blank" rel="noopener">Open the Google Sheet <span class="arrow">↗</span></a>
     </div>
     <div class="refresh">
       <div class="stamp" id="stamp">Loading…</div>
+      <button class="rl" id="theme" type="button" title="Switch background">
+        <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"></svg>
+        <span id="themeLabel">Light</span>
+      </button>
       <button class="rl" id="reload" type="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M21 12a9 9 0 1 1-3.2-6.9"></path><path d="M21 3v6h-6"></path>
@@ -654,6 +710,28 @@
         el("reload").disabled = false;
       });
   }
+
+  // ---------- theme ----------
+  var ICON = {
+    // Shown on the button you press to GET that theme.
+    light: '<circle cx="12" cy="12" r="4.2"></circle><path d="M12 2.6v2M12 19.4v2M2.6 12h2M19.4 12h2M5.4 5.4l1.4 1.4M17.2 17.2l1.4 1.4M18.6 5.4l-1.4 1.4M6.8 17.2l-1.4 1.4"></path>',
+    dark:  '<path d="M20.8 13.4A8.4 8.4 0 1 1 10.6 3.2a6.6 6.6 0 0 0 10.2 10.2z"></path>'
+  };
+  function currentTheme(){
+    return document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
+  }
+  function applyTheme(t){
+    document.documentElement.setAttribute("data-theme", t);
+    var next = t === "light" ? "dark" : "light";
+    el("themeIcon").innerHTML = ICON[next];
+    el("themeLabel").textContent = next === "light" ? "Light" : "Dark";
+    el("theme").title = "Switch to the "+next+" background";
+    try{ localStorage.setItem("studio303-theme", t); }catch(e){}
+  }
+  applyTheme(currentTheme());
+  el("theme").addEventListener("click", function(){
+    applyTheme(currentTheme() === "light" ? "dark" : "light");
+  });
 
   el("reload").addEventListener("click", load);
   load();
