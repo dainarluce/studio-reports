@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Vendor QC — Monthly Dashboard</title>
+<title>Vendor Invoice Report — Live</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Work+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
@@ -87,6 +87,9 @@
   tr:last-child td{border-bottom:none;}
   tr.total td{font-weight:700;color:#fff;border-top:1px solid var(--line2);border-bottom:none;background:rgba(54,152,232,.06);}
   .vname{font-weight:600;}
+  tr.grouphead td{background:rgba(54,152,232,.05);font-weight:600;color:#fff;}
+  td.gname{font-family:'Inter';font-weight:700;font-size:12.5px;color:var(--sky);letter-spacing:.3px;}
+  td.vname.sub{padding-left:28px;font-weight:500;}
   .flag{display:inline-block;font-size:10px;color:var(--muted2);margin-left:6px;}
 
   /* two-col layout */
@@ -117,8 +120,8 @@
 <div class="wrap">
   <div class="topbar">
     <div>
-      <div class="label"><span class="dot"></span>Vendors Invoices · Live</div>
-      <h1>Vendor QC — Monthly Dashboard</h1>
+      <div class="label"><span class="dot"></span>Vendor Invoice Report · Live</div>
+      <h1>Vendor Dashboard</h1>
       <div class="sub" id="sub">Pulled live from the published Google Sheet each time this page loads.</div>
     </div>
     <div class="refresh">
@@ -419,7 +422,8 @@
     }
 
     var cards = [
-      { k:"Total invoiced"+(span ? " ("+span+")" : ""), v:fmt(grand), d:monthsWithData+" month"+(monthsWithData===1?"":"s")+" with amount data" },
+      { k:"Total invoiced until today", v:fmt(grand),
+        d:(span ? span+" · " : "")+monthsWithData+" month"+(monthsWithData===1?"":"s")+" with amount data" },
       { k:"Pending payment", v:fmt(pending), d:pct+"% of that total is still waiting", warn:true },
       { k:"Active vendors", v:active+" / "+data.vendors.length, d:(data.vendors.length-active)+" with no spend recorded" },
       { k:"Open invoices", v:String(open),
@@ -441,7 +445,7 @@
       return '<div class="bar-col">'+
         '<div class="bar-val'+(empty ? " dim" : "")+'">'+(empty ? "—" : esc(fmt(m.total,false)))+'</div>'+
         '<div class="bar'+(empty ? " empty" : "")+'" style="height:'+h+'%"></div>'+
-        '<div class="bar-lbl">'+esc(m.date ? shortMonth(m.date) : "No date")+'</div></div>';
+        '<div class="bar-lbl">'+esc(m.date ? longMonth(m.date) : "No date")+'</div></div>';
     }).join("");
     el("chartDesc").textContent = data.months.length === 1
       ? "One month is in the sheet so far. Add more months and this chart fills in on its own."
@@ -465,15 +469,49 @@
     if(data.months.length > 1) html += '<th class="num">Total</th>';
     html += "</tr>";
 
+    // Vendors sharing a first word ("Potion Flat Rate" / "Potion Hour Rate") collapse
+    // under one heading carrying the subtotal, with the shared word stripped off below.
+    var prefixCount = {};
     data.vendors.forEach(function(v){
-      var idle = !(vendorTotal[v] > 0);
-      html += '<tr><td class="vname">'+esc(v)+(idle ? '<span class="flag">no activity</span>' : "")+"</td>";
-      data.months.forEach(function(m){
-        html += '<td class="num">'+esc(fmtAuto(cell[v+"|"+m.key] || 0))+"</td>";
-      });
-      if(data.months.length > 1) html += '<td class="num">'+esc(fmtAuto(vendorTotal[v] || 0))+"</td>";
-      html += "</tr>";
+      var w = firstWord(v);
+      prefixCount[w] = (prefixCount[w] || 0) + 1;
     });
+
+    var placed = {};
+    data.vendors.forEach(function(v){
+      if(placed[v]) return;
+      var w = firstWord(v);
+      if(prefixCount[w] < 2){ placed[v] = true; html += vendorRow(v, v, false); return; }
+
+      var members = data.vendors.filter(function(x){ return firstWord(x) === w; });
+      html += '<tr class="grouphead"><td class="gname">'+esc(w)+"</td>";
+      data.months.forEach(function(m){
+        html += '<td class="num">'+esc(fmtAuto(sumOver(members, function(x){ return cell[x+"|"+m.key] || 0; })))+"</td>";
+      });
+      if(data.months.length > 1){
+        html += '<td class="num">'+esc(fmtAuto(sumOver(members, function(x){ return vendorTotal[x] || 0; })))+"</td>";
+      }
+      html += "</tr>";
+      members.forEach(function(x){
+        placed[x] = true;
+        html += vendorRow(x, x.slice(w.length).trim() || x, true);
+      });
+    });
+
+    function firstWord(v){ return String(v).split(/\s+/)[0]; }
+    function sumOver(list, pick){
+      return list.reduce(function(acc, x){ return acc + pick(x); }, 0);
+    }
+    function vendorRow(key, label, indented){
+      var idle = !(vendorTotal[key] > 0);
+      var s = '<tr><td class="vname'+(indented ? " sub" : "")+'">'+esc(label)+
+        (idle ? '<span class="flag">no activity</span>' : "")+"</td>";
+      data.months.forEach(function(m){
+        s += '<td class="num">'+esc(fmtAuto(cell[key+"|"+m.key] || 0))+"</td>";
+      });
+      if(data.months.length > 1) s += '<td class="num">'+esc(fmtAuto(vendorTotal[key] || 0))+"</td>";
+      return s + "</tr>";
+    }
 
     html += '<tr class="total"><td>Total</td>';
     data.months.forEach(function(m){
@@ -531,7 +569,10 @@
       el("alerts").innerHTML = '<div class="empty-note">Nothing outstanding — every invoice with an amount is marked complete.</div>';
       return;
     }
-    el("alerts").innerHTML = open.map(function(rec, i){
+    // Chase list stays chronological, but the red highlight follows the money.
+    var biggest = open.reduce(function(a, b){ return b.amount > a.amount ? b : a; }, open[0]);
+
+    el("alerts").innerHTML = open.map(function(rec){
       var when = rec.month ? longMonth(rec.month) : "no month set";
       var label = statusLabel(rec.status, rec.rawStatus);
       var parts = [label];
@@ -540,7 +581,7 @@
       // Only echo the sheet's raw text when it actually differs from the canonical label.
       if(rec.rawStatus && simplify(rec.rawStatus) !== simplify(label)) parts.push("sheet says “"+rec.rawStatus+"”");
       var note = parts.join(" · ");
-      return '<div class="alert'+(i === 0 ? " high" : "")+'">'+
+      return '<div class="alert'+(rec === biggest ? " high" : "")+'">'+
         '<div><div class="l">'+esc(rec.vendor+" — "+when)+'</div>'+
         '<div class="m">'+esc(note)+'</div></div>'+
         '<div class="amt">'+esc(fmt(rec.amount))+"</div></div>";
