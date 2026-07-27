@@ -310,6 +310,9 @@
   function longMonth(d){
     return d.toLocaleString("en-US",{month:"long"}) + " " + d.getFullYear();
   }
+  function mdy(d){
+    return d.toLocaleString("en-US",{month:"short",day:"numeric",year:"numeric"});
+  }
 
   // Fuzzy-match the sheet's drifting status text onto the four canonical buckets.
   function normStatus(raw){
@@ -455,33 +458,32 @@
 
   // ---------- real render ----------
   function renderKPIs(data){
-    var grand = 0, pending = 0, open = 0, oldest = null;
-    var vendorTotals = {};
+    var today = new Date();
+    var yearNow = today.getFullYear();
+    var yearStart = new Date(yearNow, 0, 1);
+
+    var yearTotal = 0, paidTotal = 0, paidCount = 0, pending = 0, open = 0, oldest = null;
     data.records.forEach(function(rec){
-      grand += rec.amount;
-      vendorTotals[rec.vendor] = (vendorTotals[rec.vendor] || 0) + rec.amount;
-      if(rec.status === "waiting") pending += rec.amount;
+      // Undated rows still count toward the year total rather than being silently
+      // dropped — every row seen so far has a month, but don't assume that forever.
+      var inYear = !rec.month || rec.month.getFullYear() === yearNow;
+      if(inYear) yearTotal += rec.amount;
+      // Paid and pending sit next to the year total, so they share its scope —
+      // otherwise a prior-year row could inflate one card but not the other.
+      if(inYear && rec.status === "complete"){ paidTotal += rec.amount; paidCount++; }
+      if(inYear && rec.status === "waiting") pending += rec.amount;
       if(rec.amount > 0 && rec.status !== "complete"){
         open++;
         var age = daysSince(rec.received);
         if(age !== null && (oldest === null || age > oldest)) oldest = age;
       }
     });
-    var active = data.vendors.filter(function(v){ return vendorTotals[v] > 0; }).length;
-    var monthsWithData = data.months.filter(function(m){ return m.total > 0; }).length;
-    var pct = grand > 0 ? Math.round(pending / grand * 100) : 0;
-
-    var span = "";
-    if(data.months.length && data.months[0].date){
-      var a = data.months[0], b = data.months[data.months.length-1];
-      span = data.months.length === 1 ? shortMonth(a.date) : shortMonth(a.date)+"–"+shortMonth(b.date);
-    }
+    var pct = yearTotal > 0 ? Math.round(pending / yearTotal * 100) : 0;
 
     var cards = [
-      { k:"Total invoiced until today", v:fmt(grand),
-        d:(span ? span+" · " : "")+monthsWithData+" month"+(monthsWithData===1?"":"s")+" with amount data" },
+      { k:"Total year invoiced", v:fmt(yearTotal), d:mdy(yearStart)+" – "+mdy(today) },
       { k:"Pending payment", v:fmt(pending), d:pct+"% of that total is still waiting", warn:true },
-      { k:"Active vendors", v:active+" / "+data.vendors.length, d:(data.vendors.length-active)+" with no spend recorded" },
+      { k:"Total paid", v:fmt(paidTotal), d:paidCount+" invoice"+(paidCount===1?"":"s")+" marked complete" },
       { k:"Open invoices", v:String(open),
         d:oldest === null ? "Not marked complete yet" : "Oldest waiting "+oldest+" day"+(oldest===1?"":"s") }
     ];
