@@ -121,8 +121,13 @@
   .card{background:linear-gradient(180deg,var(--card),var(--card2));border:1px solid var(--line);border-radius:16px;padding:22px 24px;box-shadow:var(--shadow);}
   .chart{display:flex;align-items:flex-end;gap:18px;height:180px;margin-top:10px;padding:0 6px;}
   .bar-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:44px;}
-  .bar{width:100%;max-width:64px;border-radius:8px 8px 4px 4px;background:linear-gradient(180deg,var(--bar-from),var(--bar-to));transition:height .5s ease;}
+  .bar{width:100%;max-width:64px;border-radius:8px 8px 4px 4px;background:linear-gradient(180deg,var(--bar-from),var(--bar-to));transition:height .5s ease;overflow:hidden;}
   .bar.empty{background:repeating-linear-gradient(135deg,var(--hatch1),var(--hatch1) 6px,var(--hatch2) 6px,var(--hatch2) 12px);border:1px dashed var(--line2);}
+  .bar-stack{display:flex;flex-direction:column-reverse;width:100%;height:100%;}
+  .bar-seg{width:100%;}
+  .chart-legend{display:flex;flex-wrap:wrap;gap:14px 20px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line);}
+  .chart-legend .lg{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;color:var(--muted);}
+  .chart-legend .lg i{display:inline-block;width:9px;height:9px;border-radius:2px;flex-shrink:0;}
   .bar-val{font-family:'Inter';font-weight:700;font-size:11.5px;color:var(--strong);margin-bottom:6px;}
   .bar-val.dim{color:var(--muted2);font-weight:600;}
   .bar-lbl{margin-top:9px;font-size:11.5px;color:var(--muted);font-weight:500;white-space:nowrap;}
@@ -199,12 +204,15 @@
   <div class="section">
     <div class="stitle">Spend by month</div>
     <div class="sdesc" id="chartDesc">Total invoiced per month, straight from the sheet.</div>
-    <div class="card"><div class="chart" id="chart"></div></div>
+    <div class="card">
+      <div class="chart" id="chart"></div>
+      <div class="chart-legend" id="chartLegend"></div>
+    </div>
   </div>
 
   <div class="section cols2">
     <div class="card">
-      <div class="stitle">Spend by vendor</div>
+      <div class="stitle">Invoices amount paid</div>
       <div class="sdesc" id="vendorDesc">Every vendor in the sheet, broken out by month.</div>
       <div class="tscroll"><table id="vendorTable"></table></div>
     </div>
@@ -228,7 +236,23 @@
 (function(){
   "use strict";
 
-  var CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vThcMQgIbmHAhgAQSweG1tffOISuIU31PIcUBY0DPccivtqn5iJUQkGOOtFV-1viCsRURiAH0J01SW_/pub?output=csv";
+  var PUB_BASE = "https://docs.google.com/spreadsheets/d/e/2PACX-1vThcMQgIbmHAhgAQSweG1tffOISuIU31PIcUBY0DPccivtqn5iJUQkGOOtFV-1viCsRURiAH0J01SW_/pub?output=csv";
+
+  // Google Sheets only publishes one tab per gid, so every monthly tab needs its own
+  // entry here. Adding a new month (e.g. July) means adding one line: publish that
+  // tab, copy its gid from the sheet's URL bar, and add it below.
+  var MONTH_GIDS = [
+    "1279006561", // JANUARY 2026
+    "567445736",  // FEBRUARY 2026
+    "1179863485", // MARCH 2026
+    "793473677",  // APRIL 2026
+    "1866299885", // MAY 2026
+    "1246474389"  // JUNE 2026
+  ];
+  // Vendor x month grid with a reconciled year-to-date total in the last column —
+  // used as the authoritative "Total Year Invoiced" figure, cross-checked against
+  // the bottom-up sum of the monthly tabs above.
+  var SUMMARY_GID = "717612550";
 
   // Labels mirror the wording of the sheet's own Invoice Status dropdown.
   var STATUSES = [
@@ -407,6 +431,34 @@
     return { records:records, months:months, vendors:vendorOrder, warnings:warnings };
   }
 
+  // Every monthly tab shares one header row, so stitch them into a single sheet:
+  // header from the first tab, then every data row from every tab appended after.
+  function mergeMonthCSVs(texts){
+    var header = null, allRows = [];
+    texts.forEach(function(text){
+      var rows = parseCSV(text);
+      if(!rows.length) return;
+      if(!header) header = rows[0];
+      allRows = allRows.concat(rows.slice(1));
+    });
+    return header ? [header].concat(allRows) : [];
+  }
+
+  // Reads the Summary tab's own year-to-date total, wherever its "TOTAL YEAR ..."
+  // column lands — used as the authoritative figure, cross-checked against the
+  // bottom-up sum of the monthly tabs so a future mismatch surfaces as a warning
+  // instead of silently showing whichever number happened to render first.
+  function parseSummaryTotal(text){
+    var rows = parseCSV(text);
+    if(!rows.length) return null;
+    var cTotal = findCol(rows[0], [/total.*year/, /year.*total/]);
+    if(cTotal < 0) return null;
+    for(var r=rows.length-1; r>=1; r--){
+      if(rows[r][cTotal] && String(rows[r][cTotal]).trim()) return money(rows[r][cTotal]);
+    }
+    return null;
+  }
+
   // ---------- skeletons ----------
   function ghost(w, h){
     return '<span class="skel" style="width:'+w+';height:'+h+'px">&nbsp;</span>';
@@ -462,15 +514,13 @@
     var yearNow = today.getFullYear();
     var yearStart = new Date(yearNow, 0, 1);
 
-    var yearTotal = 0, paidTotal = 0, paidCount = 0, pending = 0, open = 0, oldest = null;
+    // The headline figure comes from the Summary tab (see load()), not a sum
+    // computed here — that's the authoritative source the user asked for.
+    var yearTotal = data.yearTotal;
+    var paidCount = 0, pending = 0, open = 0, oldest = null;
     data.records.forEach(function(rec){
-      // Undated rows still count toward the year total rather than being silently
-      // dropped — every row seen so far has a month, but don't assume that forever.
       var inYear = !rec.month || rec.month.getFullYear() === yearNow;
-      if(inYear) yearTotal += rec.amount;
-      // Paid and pending sit next to the year total, so they share its scope —
-      // otherwise a prior-year row could inflate one card but not the other.
-      if(inYear && rec.status === "complete"){ paidTotal += rec.amount; paidCount++; }
+      if(inYear && rec.status === "complete") paidCount++;
       if(inYear && rec.status === "waiting") pending += rec.amount;
       if(rec.amount > 0 && rec.status !== "complete"){
         open++;
@@ -479,6 +529,10 @@
       }
     });
     var pct = yearTotal > 0 ? Math.round(pending / yearTotal * 100) : 0;
+    // Total paid = year invoiced minus pending, not a separate sum — matches
+    // every row seen so far exactly, since every invoice is currently either
+    // Complete, waiting on Ruth, or a $0 unused month with nothing in between.
+    var paidTotal = yearTotal - pending;
 
     var cards = [
       { k:"Total year invoiced", v:fmt(yearTotal), d:mdy(yearStart)+" – "+mdy(today) },
@@ -494,20 +548,53 @@
     }).join("");
   }
 
+  // Segment order is bottom-to-top in the stack. "other" catches anything that
+  // isn't Complete/Waiting/PO — normally $0 (Did not use this month), so seeing
+  // it with real height is itself a signal something needs a look.
+  var CHART_SEGMENTS = [
+    { key:"complete", color:"var(--green)", label:"Complete" },
+    { key:"waiting",  color:"var(--amber)", label:"With Ruth — need payment" },
+    { key:"po",       color:"var(--sky)",   label:"Approved — ready for PO" },
+    { key:"other",    color:"var(--red)",   label:"Other" }
+  ];
+
   function renderChart(data){
     var max = 0;
     data.months.forEach(function(m){ if(m.total > max) max = m.total; });
+
+    var usedOther = false;
     el("chart").innerHTML = data.months.map(function(m){
       var empty = !(m.total > 0);
       var h = empty ? 14 : Math.max(6, Math.round(m.total / max * 97));
+
+      var buckets = { complete:0, waiting:0, po:0, other:0 };
+      m.records.forEach(function(rec){
+        var key = (rec.status === "complete" || rec.status === "waiting" || rec.status === "po") ? rec.status : "other";
+        buckets[key] += rec.amount;
+      });
+      if(buckets.other > 0) usedOther = true;
+
+      var stack = empty ? "" : '<div class="bar-stack">'+CHART_SEGMENTS.filter(function(s){
+        return buckets[s.key] > 0;
+      }).map(function(s){
+        return '<div class="bar-seg" style="height:'+(buckets[s.key]/m.total*100)+'%;background:'+s.color+'"></div>';
+      }).join("")+'</div>';
+
       return '<div class="bar-col">'+
         '<div class="bar-val'+(empty ? " dim" : "")+'">'+(empty ? "—" : esc(fmt(m.total,false)))+'</div>'+
-        '<div class="bar'+(empty ? " empty" : "")+'" style="height:'+h+'%"></div>'+
+        '<div class="bar'+(empty ? " empty" : "")+'" style="height:'+h+'%">'+stack+'</div>'+
         '<div class="bar-lbl">'+esc(m.date ? longMonth(m.date) : "No date")+'</div></div>';
     }).join("");
+
     el("chartDesc").textContent = data.months.length === 1
       ? "One month is in the sheet so far. Add more months and this chart fills in on its own."
       : "Total invoiced per month across the "+data.months.length+" months in the sheet.";
+
+    el("chartLegend").innerHTML = CHART_SEGMENTS.filter(function(s){
+      return s.key !== "other" || usedOther;
+    }).map(function(s){
+      return '<span class="lg"><i style="background:'+s.color+'"></i>'+esc(s.label)+'</span>';
+    }).join("");
   }
 
   function renderVendorTable(data){
@@ -684,15 +771,37 @@
     el("stamp").textContent = "Fetching latest…";
     renderSkeleton();
 
-    fetch(CSV_URL + "&_=" + Date.now(), { cache:"no-store", redirect:"follow" })
-      .then(function(res){
-        if(!res.ok) throw new Error("The server answered "+res.status+" "+res.statusText+".");
-        return res.text();
+    var bust = "&_=" + Date.now();
+    function getCSV(gid){
+      return fetch(PUB_BASE + "&gid=" + gid + bust, { cache:"no-store", redirect:"follow" })
+        .then(function(res){
+          if(!res.ok) throw new Error("The server answered "+res.status+" "+res.statusText+" for one of the monthly tabs.");
+          return res.text();
+        });
+    }
+
+    Promise.all(MONTH_GIDS.map(getCSV))
+      .then(function(monthTexts){
+        // The Summary tab is a nice-to-have cross-check, not load-bearing — if its
+        // publish link ever breaks, fall back to the bottom-up total silently.
+        return getCSV(SUMMARY_GID)
+          .then(function(t){ return { monthTexts:monthTexts, summaryText:t }; })
+          .catch(function(){ return { monthTexts:monthTexts, summaryText:null }; });
       })
-      .then(function(text){
-        var data = shape(parseCSV(text));
+      .then(function(bundle){
+        var data = shape(mergeMonthCSVs(bundle.monthTexts));
+
+        var bottomUp = data.records.reduce(function(sum, rec){ return sum + rec.amount; }, 0);
+        var summaryTotal = bundle.summaryText ? parseSummaryTotal(bundle.summaryText) : null;
+        data.yearTotal = summaryTotal !== null ? summaryTotal : bottomUp;
+        if(summaryTotal !== null && Math.abs(summaryTotal - bottomUp) > 0.01){
+          data.warnings.push("The Summary tab's year total ("+fmt(summaryTotal)+") doesn't match the sum of "+
+            "the monthly tabs ("+fmt(bottomUp)+"). Showing the Summary tab's figure — check for a row missed "+
+            "in one or the other.");
+        }
+
         if(data.warnings.length){
-          el("warn").innerHTML = "<b>The sheet loaded, but some columns weren’t recognised:</b><ul>"+
+          el("warn").innerHTML = "<b>The sheet loaded, but something needs a look:</b><ul>"+
             data.warnings.map(function(w){ return "<li>"+esc(w)+"</li>"; }).join("")+"</ul>";
           el("warn").classList.add("show");
         }
