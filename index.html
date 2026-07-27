@@ -24,7 +24,7 @@
     color-scheme:dark;
     --bg:#080d1a; --card:#111b30; --card2:#0f1830; --line:#1e2b45; --line2:#26375a;
     --blue:#3698E8; --sky:#7CC0F4; --muted:#8ea3c4; --muted2:#6a7ea0; --white:#eef4fc;
-    --green:#3ecf8e; --amber:#e8a63e; --red:#e8613e;
+    --green:#3ecf8e; --amber:#e8a63e; --red:#e8613e; --orange:#f2843e;
     --strong:#ffffff;                 /* headings and key figures */
     --bar-from:#7CC0F4; --bar-to:#3698E8;
     --hatch1:#1c2947; --hatch2:#233255;
@@ -40,7 +40,7 @@
     color-scheme:light;
     --bg:#f4f6fa; --card:#ffffff; --card2:#fbfcfe; --line:#e5e9f1; --line2:#d3dae6;
     --blue:#1b6fb5; --sky:#17618f; --muted:#5a6a84; --muted2:#78879f; --white:#111827;
-    --green:#0e8f5a; --amber:#9a6206; --red:#c0410f;
+    --green:#0e8f5a; --amber:#9a6206; --red:#c0410f; --orange:#b8560f;
     --strong:#0b1220;
     --bar-from:#78b5e9; --bar-to:#1b6fb5;
     --hatch1:#eef2f8; --hatch2:#e1e8f2;
@@ -234,14 +234,6 @@
   // the bottom-up sum of the monthly tabs above.
   var SUMMARY_GID = "717612550";
 
-  // Labels mirror the wording of the sheet's own Invoice Status dropdown.
-  var STATUSES = [
-    { key:"complete", label:"Complete",                  color:"var(--green)" },
-    { key:"waiting",  label:"With Ruth — need payment",  color:"var(--amber)" },
-    { key:"po",       label:"Approved — ready for PO",   color:"var(--sky)"   },
-    { key:"unused",   label:"Did not use this month",    color:"var(--muted2)"}
-  ];
-
   var el = function(id){ return document.getElementById(id); };
 
   // --- CSV parsing (handles quoted fields, embedded commas, escaped quotes, CRLF) ---
@@ -326,7 +318,7 @@
     // "DONT USE THIS MONTH", "DON USE THIS MONTHS", "NO WORK IN JANUARY".
     if(/n[o']?t? ?use|no work|unused|skip/.test(s)) return "unused";
     if(/complet|done|closed|paid/.test(s)) return "complete";
-    if(/wait|need payment|ruth|pending|unpaid/.test(s)) return "waiting";
+    if(/wait|need payment|ruth|rutu|pending|unpaid/.test(s)) return "waiting";
     if(/approv|ready|\bpo\b/.test(s)) return "po";
     return "other";
   }
@@ -499,7 +491,7 @@
     var pct = yearTotal > 0 ? Math.round(pending / yearTotal * 100) : 0;
     // Total paid = year invoiced minus pending, not a separate sum — matches
     // every row seen so far exactly, since every invoice is currently either
-    // Complete, waiting on Ruth, or a $0 unused month with nothing in between.
+    // Complete, waiting on Rutu, or a $0 unused month with nothing in between.
     var paidTotal = yearTotal - pending;
 
     var cards = [
@@ -521,7 +513,7 @@
   // it with real height is itself a signal something needs a look.
   var CHART_SEGMENTS = [
     { key:"complete", color:"var(--green)", label:"Complete" },
-    { key:"waiting",  color:"var(--amber)", label:"With Ruth — need payment" },
+    { key:"waiting",  color:"var(--orange)", label:"With Rutu — need payment" },
     { key:"po",       color:"var(--sky)",   label:"Approved — ready for PO" },
     { key:"other",    color:"var(--red)",   label:"Other" }
   ];
