@@ -26,7 +26,6 @@
     --blue:#3698E8; --sky:#7CC0F4; --muted:#8ea3c4; --muted2:#6a7ea0; --white:#eef4fc;
     --green:#3ecf8e; --amber:#e8a63e; --red:#e8613e;
     --strong:#ffffff;                 /* headings and key figures */
-    --panel:#0c1830;                  /* alert rows, insets */
     --bar-from:#7CC0F4; --bar-to:#3698E8;
     --hatch1:#1c2947; --hatch2:#233255;
     --skel1:#182543; --skel2:#233350;
@@ -43,7 +42,6 @@
     --blue:#1b6fb5; --sky:#17618f; --muted:#5a6a84; --muted2:#78879f; --white:#111827;
     --green:#0e8f5a; --amber:#9a6206; --red:#c0410f;
     --strong:#0b1220;
-    --panel:#f7f9fc;
     --bar-from:#78b5e9; --bar-to:#1b6fb5;
     --hatch1:#eef2f8; --hatch2:#e1e8f2;
     --skel1:#e7ecf4; --skel2:#dae2ed;
@@ -63,6 +61,7 @@
 
   h1{font-family:'Inter';font-weight:800;font-size:30px;letter-spacing:-.5px;color:var(--strong);}
   .sub{font-size:14px;color:var(--muted);margin-top:8px;max-width:720px;}
+  .links{display:flex;flex-wrap:wrap;column-gap:20px;row-gap:4px;}
   .sheetlink{display:inline-block;margin-top:9px;font-size:12.5px;font-weight:500;color:var(--blue);
     text-decoration:none;border-bottom:1px solid transparent;transition:border-color .15s;}
   .sheetlink:hover{border-bottom-color:var(--blue);}
@@ -147,16 +146,6 @@
   td.vname.sub{padding-left:28px;font-weight:500;}
   .flag{display:inline-block;font-size:10px;color:var(--muted2);margin-left:6px;}
 
-  /* alerts */
-  .alert{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-radius:10px;background:var(--panel);border:1px solid var(--line);margin-bottom:9px;}
-  .alert:last-child{margin-bottom:0;}
-  .alert .l{font-size:13px;color:var(--strong);font-weight:600;}
-  .alert .m{font-size:11.5px;color:var(--muted);margin-top:2px;}
-  .alert .amt{font-family:'Inter';font-weight:700;font-size:14px;color:var(--amber);white-space:nowrap;margin-left:14px;}
-  .alert.high{border-color:rgba(232,97,62,.4);}
-  .alert.high .amt{color:var(--red);}
-  .empty-note{font-size:12.5px;color:var(--muted2);padding:4px 0;}
-
   .footnote{margin-top:34px;padding-top:18px;border-top:1px solid var(--line);font-size:11px;color:var(--muted2);letter-spacing:.2px;}
   @media(max-width:820px){.kpis{grid-template-columns:1fr 1fr;}.kpis.kpis3{grid-template-columns:1fr 1fr;}}
 </style>
@@ -168,9 +157,14 @@
       <div class="label"><span class="dot"></span>Vendor Invoice Report · Live</div>
       <h1>Studio 303 — Vendors Dashboard</h1>
       <div class="sub" id="sub">Pulled live from the published Google Sheet each time this page loads.</div>
-      <a class="sheetlink" id="sheetlink"
-         href="https://docs.google.com/spreadsheets/d/1JythZCvEqx3xHaRsIyUtelivANPwlrrB9B2Ba5Mupok/edit?gid=1246474389#gid=1246474389"
-         target="_blank" rel="noopener">Open the Google Sheet <span class="arrow">↗</span></a>
+      <div class="links">
+        <a class="sheetlink" id="sheetlink"
+           href="https://docs.google.com/spreadsheets/d/1JythZCvEqx3xHaRsIyUtelivANPwlrrB9B2Ba5Mupok/edit?gid=1246474389#gid=1246474389"
+           target="_blank" rel="noopener">Open the Google Sheet <span class="arrow">↗</span></a>
+        <a class="sheetlink" id="drivelink"
+           href="https://drive.google.com/drive/folders/1LbfAxmoVJ68QbVhK6eHHEnskbh89xPGh?usp=sharing"
+           target="_blank" rel="noopener">Open Drive — invoices, POs &amp; buyouts <span class="arrow">↗</span></a>
+      </div>
     </div>
     <div class="refresh">
       <div class="stamp" id="stamp">Loading…</div>
@@ -213,12 +207,6 @@
     <div class="stitle">Summary</div>
     <div class="sdesc">Quick read on where the money's going</div>
     <div class="kpis kpis3" id="summaryKpis"></div>
-  </div>
-
-  <div class="section">
-    <div class="stitle">What Carmine needs to see</div>
-    <div class="sdesc">Invoices with an amount that aren't marked complete yet, largest first</div>
-    <div class="card" id="alerts"></div>
   </div>
 
   <div class="footnote" id="foot">Source: published Google Sheet (CSV). Edit the sheet, then hit <b>Refresh data</b> — no code changes needed.</div>
@@ -342,11 +330,6 @@
     if(/approv|ready|\bpo\b/.test(s)) return "po";
     return "other";
   }
-  function statusLabel(key, raw){
-    for(var i=0;i<STATUSES.length;i++){ if(STATUSES[i].key === key) return STATUSES[i].label; }
-    return String(raw || "Unlabelled");
-  }
-
   // Header names drift as the sheet gets tidied up ("Status" -> "Invoice Status",
   // "amount" -> "Total Invoice Amount"), so match on a list of patterns, best first.
   function findCol(headers, tries){
@@ -491,14 +474,6 @@
               '<div class="d">'+ghost("55%",11)+'</div></div>';
     }
     el("summaryKpis").innerHTML = html;
-
-    html = "";
-    for(i=0;i<4;i++){
-      html += '<div class="alert"><div><div class="l">'+ghost("200px",13)+'</div>'+
-              '<div class="m">'+ghost("150px",11)+'</div></div>'+
-              '<div class="amt">'+ghost("76px",14)+'</div></div>';
-    }
-    el("alerts").innerHTML = html;
   }
 
   // ---------- real render ----------
@@ -725,42 +700,6 @@
     }).join("");
   }
 
-  function renderAlerts(data){
-    var open = data.records.filter(function(rec){
-      return rec.amount > 0 && rec.status !== "complete" && rec.status !== "unused";
-    }).sort(function(a,b){
-      // Oldest invoice first — that's the one that needs chasing. Undated rows sink to the bottom.
-      if(a.received && b.received) return a.received - b.received;
-      if(a.received) return -1;
-      if(b.received) return 1;
-      return b.amount - a.amount;
-    });
-
-    if(!open.length){
-      el("alerts").innerHTML = '<div class="empty-note">Nothing outstanding — every invoice with an amount is marked complete.</div>';
-      return;
-    }
-    // Chase list stays chronological, but the red highlight follows the money.
-    var biggest = open.reduce(function(a, b){ return b.amount > a.amount ? b : a; }, open[0]);
-
-    el("alerts").innerHTML = open.map(function(rec){
-      var when = rec.month ? longMonth(rec.month) : "no month set";
-      var label = statusLabel(rec.status, rec.rawStatus);
-      var parts = [label];
-      var age = daysSince(rec.received);
-      if(age !== null) parts.push(age === 0 ? "invoice arrived today" : age+" day"+(age===1?"":"s")+" since invoice arrived");
-      // Only echo the sheet's raw text when it actually differs from the canonical label.
-      if(rec.rawStatus && simplify(rec.rawStatus) !== simplify(label)) parts.push("sheet says “"+rec.rawStatus+"”");
-      var note = parts.join(" · ");
-      return '<div class="alert'+(rec === biggest ? " high" : "")+'">'+
-        '<div><div class="l">'+esc(rec.vendor+" — "+when)+'</div>'+
-        '<div class="m">'+esc(note)+'</div></div>'+
-        '<div class="amt">'+esc(fmt(rec.amount))+"</div></div>";
-    }).join("");
-  }
-
-  function simplify(s){ return String(s).toLowerCase().replace(/[^a-z0-9]/g,""); }
-
   function esc(s){
     return String(s).replace(/[&<>"']/g, function(c){
       return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c];
@@ -835,7 +774,6 @@
         renderChart(data);
         renderVendorTable(data);
         renderSummary(data);
-        renderAlerts(data);
         el("stamp").textContent = "Updated "+new Date().toLocaleString("en-US",{
           month:"short", day:"numeric", hour:"numeric", minute:"2-digit"
         });
