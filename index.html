@@ -187,11 +187,20 @@
   <div class="section"><div class="kpis" id="kpis"></div></div>
 
   <div class="section">
-    <div class="stitle">Spend by month</div>
+    <div class="stitle">Status by month</div>
     <div class="sdesc" id="chartDesc">Total invoiced per month, straight from the sheet.</div>
     <div class="card">
       <div class="chart" id="chart"></div>
       <div class="chart-legend" id="chartLegend"></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="stitle">Visual spend by month</div>
+    <div class="sdesc" id="vendorChartDesc">Same totals, colored by which vendor the money went to.</div>
+    <div class="card">
+      <div class="chart" id="vendorChart"></div>
+      <div class="chart-legend" id="vendorChartLegend"></div>
     </div>
   </div>
 
@@ -448,6 +457,7 @@
               '<div class="bar-lbl">'+ghost("36px",11)+'</div></div>';
     }
     el("chart").innerHTML = html;
+    el("vendorChart").innerHTML = html;
 
     html = "<tr><th>"+ghost("70px",10)+"</th>";
     for(i=0;i<4;i++) html += '<th class="num">'+ghost("34px",10)+"</th>";
@@ -554,6 +564,49 @@
       return s.key !== "other" || usedOther;
     }).map(function(s){
       return '<span class="lg"><i style="background:'+s.color+'"></i>'+esc(s.label)+'</span>';
+    }).join("");
+  }
+
+  // Matches the row-highlight colors already used for each vendor in the Google
+  // Sheet, so this chart reads as the same color-coding, not a new one.
+  var VENDOR_COLORS = {
+    "Potion Flat Rate": "#8fa8dd",
+    "Potion Hour Rate": "#c9d9f2",
+    "Color Expert":     "#c48ea3",
+    "GSL":               "#93c47d",
+    "Pixshot":           "#f4c04d"
+  };
+  var VENDOR_FALLBACK = "var(--muted2)";
+
+  function renderVendorChart(data){
+    var max = 0;
+    data.months.forEach(function(m){ if(m.total > max) max = m.total; });
+
+    el("vendorChart").innerHTML = data.months.map(function(m){
+      var empty = !(m.total > 0);
+      var h = empty ? 14 : Math.max(6, Math.round(m.total / max * 97));
+
+      var byVendor = {};
+      m.records.forEach(function(rec){
+        byVendor[rec.vendor] = (byVendor[rec.vendor] || 0) + rec.amount;
+      });
+
+      var stack = empty ? "" : '<div class="bar-stack">'+data.vendors.filter(function(v){
+        return (byVendor[v] || 0) > 0;
+      }).map(function(v){
+        var color = VENDOR_COLORS[v] || VENDOR_FALLBACK;
+        return '<div class="bar-seg" style="height:'+(byVendor[v]/m.total*100)+'%;background:'+color+'"></div>';
+      }).join("")+'</div>';
+
+      return '<div class="bar-col">'+
+        '<div class="bar-val'+(empty ? " dim" : "")+'">'+(empty ? "—" : esc(fmt(m.total,false)))+'</div>'+
+        '<div class="bar'+(empty ? " empty" : "")+'" style="height:'+h+'%">'+stack+'</div>'+
+        '<div class="bar-lbl">'+esc(m.date ? longMonth(m.date) : "No date")+'</div></div>';
+    }).join("");
+
+    el("vendorChartLegend").innerHTML = data.vendors.map(function(v){
+      var color = VENDOR_COLORS[v] || VENDOR_FALLBACK;
+      return '<span class="lg"><i style="background:'+color+'"></i>'+esc(v)+'</span>';
     }).join("");
   }
 
@@ -764,6 +817,7 @@
         }
         renderKPIs(data);
         renderChart(data);
+        renderVendorChart(data);
         renderVendorTable(data);
         renderSummary(data);
         el("stamp").textContent = "Updated "+new Date().toLocaleString("en-US",{
