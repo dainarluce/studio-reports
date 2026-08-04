@@ -131,6 +131,17 @@
   .chart-legend{display:flex;flex-wrap:wrap;gap:14px 20px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line);}
   .chart-legend .lg{display:inline-flex;align-items:center;gap:7px;font-size:13.5px;color:var(--muted);}
   .chart-legend .lg i{display:inline-block;width:10px;height:10px;border-radius:2px;flex-shrink:0;}
+
+  /* Colors invert relative to the page — dark chip on light mode, light chip on
+     dark mode — same trick a printed label uses to always read against its page. */
+  .seg-tip{position:fixed;left:0;top:0;pointer-events:none;z-index:50;
+    background:var(--strong);color:var(--bg);font-family:'Work Sans',sans-serif;
+    padding:7px 11px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.2);
+    opacity:0;transform:translate(-50%,calc(-100% - 12px));transition:opacity .1s ease;
+    white-space:nowrap;}
+  .seg-tip.show{opacity:1;}
+  .seg-tip b{display:block;font-size:12.5px;font-weight:700;}
+  .seg-tip .sub{display:block;font-size:11.5px;font-weight:500;opacity:.75;margin-top:1px;}
   .bar-val{font-family:'Inter';font-weight:700;font-size:11.5px;color:var(--strong);margin-bottom:6px;}
   .bar-val.dim{color:var(--muted2);font-weight:600;}
   .bar-lbl{margin-top:9px;font-size:11.5px;color:var(--muted);font-weight:500;white-space:nowrap;}
@@ -210,6 +221,7 @@
     <div class="card">
       <div class="chart" id="vendorChart"></div>
       <div class="chart-legend" id="vendorChartLegend"></div>
+      <div class="seg-tip" id="segTip"></div>
     </div>
   </div>
 
@@ -605,7 +617,9 @@
         return (byVendor[v] || 0) > 0;
       }).map(function(v){
         var color = VENDOR_COLORS[v] || VENDOR_FALLBACK;
-        return '<div class="bar-seg" style="height:'+(byVendor[v]/m.total*100)+'%;background:'+color+'"></div>';
+        var pct = byVendor[v] / m.total * 100;
+        return '<div class="bar-seg" style="height:'+pct+'%;background:'+color+'" '+
+          'data-vendor="'+esc(v)+'" data-amt="'+esc(fmt(byVendor[v]))+'" data-pct="'+pct.toFixed(1)+'"></div>';
       }).join("")+'</div>';
 
       return '<div class="bar-col">'+
@@ -862,6 +876,31 @@
   el("theme").addEventListener("click", function(){
     applyTheme(currentTheme() === "light" ? "dark" : "light");
   });
+
+  // ---------- vendor-segment tooltip ----------
+  // One delegated listener on the chart container, not one per segment — it
+  // keeps working across every re-render since renderVendorChart only ever
+  // replaces #vendorChart's children, never the container itself.
+  (function(){
+    var tip = el("segTip");
+    var host = el("vendorChart");
+    function segOf(e){ return e.target.closest ? e.target.closest(".bar-seg") : null; }
+    host.addEventListener("mouseover", function(e){
+      var s = segOf(e);
+      if(!s) return;
+      tip.innerHTML = "<b>"+esc(s.dataset.vendor)+"</b><span class=\"sub\">"+
+        esc(s.dataset.amt)+" · "+esc(s.dataset.pct)+"%</span>";
+      tip.classList.add("show");
+    });
+    host.addEventListener("mousemove", function(e){
+      if(!tip.classList.contains("show")) return;
+      tip.style.left = e.clientX + "px";
+      tip.style.top = e.clientY + "px";
+    });
+    host.addEventListener("mouseout", function(e){
+      if(segOf(e)) tip.classList.remove("show");
+    });
+  })();
 
   el("reload").addEventListener("click", load);
   load();
