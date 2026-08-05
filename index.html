@@ -192,9 +192,52 @@
        actually kick in within the available width. */
     .refresh{flex-shrink:1;width:100%;}
   }
+
+  /* Password gate — a courtesy lock for people who already have the link and
+     the password, not real security. Anyone can view-source and find it;
+     that's an accepted tradeoff for a small trusted-team dashboard, not a bug. */
+  .gate{position:fixed;inset:0;z-index:1000;background:var(--bg);display:flex;
+    align-items:center;justify-content:center;padding:20px;}
+  .gate.unlocked{display:none;}
+  .gate-card{background:linear-gradient(180deg,var(--card),var(--card2));border:1px solid var(--line);
+    border-radius:16px;padding:32px 28px;max-width:340px;width:100%;text-align:center;box-shadow:var(--shadow);}
+  .gate-card .label{justify-content:center;}
+  .gate-card h2{font-family:'Inter';font-weight:800;font-size:19px;color:var(--strong);margin:14px 0 6px;}
+  .gate-card p{font-size:13px;color:var(--muted);margin-bottom:18px;}
+  .gate-card input{width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--line2);
+    border-radius:10px;padding:11px 14px;font-size:14px;color:var(--strong);font-family:'Work Sans',sans-serif;
+    text-align:center;letter-spacing:1px;}
+  .gate-card input:focus{outline:none;border-color:var(--blue);}
+  .gate-card button{width:100%;margin-top:12px;background:linear-gradient(180deg,var(--btn1),var(--btn2));
+    border:1px solid var(--line2);border-radius:10px;color:var(--white);font-family:'Work Sans',sans-serif;
+    font-weight:600;font-size:13.5px;padding:11px;cursor:pointer;}
+  .gate-card button:hover{border-color:var(--blue);}
+  .gate-err{display:none;font-size:12.5px;color:var(--red);margin-top:10px;}
+  .gate-err.show{display:block;}
 </style>
 </head>
 <body class="loading">
+<div class="gate" id="gate">
+  <form class="gate-card" id="gateForm">
+    <div class="label"><span class="dot"></span>Vendor Invoice Report</div>
+    <h2>This dashboard is private</h2>
+    <p>Enter the password to continue.</p>
+    <input type="password" id="gatePw" autocomplete="current-password" placeholder="Password" autofocus>
+    <button type="submit">Unlock</button>
+    <div class="gate-err" id="gateErr">Wrong password — try again.</div>
+  </form>
+</div>
+<script>
+(function(){
+  // Runs synchronously, before the rest of the page paints, so a returning
+  // trusted visitor never sees the lock screen flash before it disappears.
+  try{
+    if(localStorage.getItem("studio303-unlocked") === "1"){
+      document.write('<style>#gate{display:none!important}</style>');
+    }
+  }catch(e){}
+})();
+</script>
 <div class="wrap">
   <div class="topbar">
     <div>
@@ -955,6 +998,28 @@
     });
     document.addEventListener("click", hide);
   })();
+
+  // ---------- password gate ----------
+  // Not real security — a static page can't keep a determined person out,
+  // this just keeps the link from being casually stumbled into.
+  var GATE_PASSWORD = "studio303";
+  el("gateForm").addEventListener("submit", function(e){
+    e.preventDefault();
+    var pw = el("gatePw").value.trim().toLowerCase();
+    if(pw === GATE_PASSWORD){
+      try{ localStorage.setItem("studio303-unlocked", "1"); }catch(err){}
+      el("gate").classList.add("unlocked");
+      el("gateErr").classList.remove("show");
+    } else {
+      el("gateErr").classList.add("show");
+      // select() instead of clearing the value directly — some browsers
+      // silently restore the submitted value right after a prevented
+      // Enter-triggered submit, so an explicit value="" doesn't reliably
+      // stick. Selecting it means the next keystroke replaces it either way.
+      el("gatePw").focus();
+      el("gatePw").select();
+    }
+  });
 
   el("reload").addEventListener("click", load);
   load();
