@@ -153,7 +153,11 @@
   /* Full-strength color and now full weight on both lines too — a real
      reviewer still called the previous version (16px/14.5px, 700/600) hard
      to read, so the size step-down is doing the hierarchy work alone now. */
-  .seg-tip .sub{display:block;font-size:17px;font-weight:700;margin-top:5px;}
+  /* Named .amt, not .sub — .sub is already the page-subtitle class elsewhere
+     on the page (color:var(--muted)), and reusing it here let that muted
+     gray silently leak into the tooltip instead of the intended full-contrast
+     color. color:inherit pins it to the parent's color defensively either way. */
+  .seg-tip .amt{display:block;font-size:17px;font-weight:700;margin-top:5px;color:inherit;}
   .bar-val{font-family:'Inter';font-weight:700;font-size:11.5px;color:var(--strong);margin-bottom:6px;}
   .bar-val.dim{color:var(--muted2);font-weight:600;}
   .bar-lbl{margin-top:9px;font-size:11.5px;color:var(--muted);font-weight:500;white-space:nowrap;}
@@ -914,7 +918,7 @@
     var tip = el("segTip");
     function segOf(e){ return e.target.closest ? e.target.closest(".bar-seg") : null; }
     function show(s, x, y){
-      tip.innerHTML = "<b>"+esc(s.dataset.label)+"</b><span class=\"sub\">"+
+      tip.innerHTML = "<b>"+esc(s.dataset.label)+"</b><span class=\"amt\">"+
         esc(s.dataset.amt)+" · "+esc(s.dataset.pct)+"%</span>";
       tip.style.left = x + "px";
       tip.style.top = y + "px";
