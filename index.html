@@ -528,11 +528,25 @@
     var rows = parseCSV(text);
     if(!rows.length) return null;
     var cTotal = findCol(rows[0], [/total.*year/, /year.*total/]);
-    if(cTotal < 0) return null;
-    for(var r=rows.length-1; r>=1; r--){
-      if(rows[r][cTotal] && String(rows[r][cTotal]).trim()) return money(rows[r][cTotal]);
+    // Sum every vendor's month cells directly rather than trusting the
+    // sheet's own row-7 subtotals or the grand-total cell — those need a
+    // formula someone remembers to extend every time a new month column
+    // shows up, and that's already lagged behind once (August's per-vendor
+    // cell was filled in, but the row-7 subtotal for it wasn't). Summing
+    // the raw cells only depends on invoice amounts being entered, which
+    // happens as a side effect of normal data entry, not a separate step.
+    var sum = 0, any = false;
+    for(var r=1; r<rows.length; r++){
+      var row = rows[r];
+      var vendor = String(row[0] == null ? "" : row[0]).trim();
+      if(!vendor) continue; // the sheet's own totals row has a blank Vendor cell
+      any = true;
+      for(var c=1; c<row.length; c++){
+        if(c === cTotal) continue; // skip the grand-total column itself
+        sum += money(row[c]);
+      }
     }
-    return null;
+    return any ? sum : null;
   }
 
   // ---------- skeletons ----------
